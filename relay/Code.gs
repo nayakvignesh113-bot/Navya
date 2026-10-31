@@ -9,6 +9,7 @@
  *   OWNER_EMAILS          required  comma-separated, e.g. vignesh@mite.ac.in,nayak.vignesh113@gmail.com
  *   AUTO_APPROVE_DOMAIN   optional  e.g. mite.ac.in  (accounts on this domain are approved automatically)
  *   MODEL                 optional  default gemini-flash-latest
+ *   MODEL_FALLBACKS       optional  tried in order on overload/404, default gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite
  *   STUDENT_DAILY_CALLS   optional  default 150 model calls per approved user per day (~4 full analyses)
  *   RADAR_EMAIL           optional  "true" to email owners the weekly radar digest
  *   CONTACT_EMAIL         optional  sent to OpenAlex as mailto (polite pool)
@@ -103,7 +104,9 @@ function gemini(who, req) {
   return geminiCall(req);
 }
 function geminiCall(req) {
-  const model = req.model || prop('MODEL', 'gemini-flash-latest');
+  // Primary model, then fallbacks when Google reports overload (503/429) or retires a model (404).
+  const models = [req.model || prop('MODEL', 'gemini-flash-latest')]
+    .concat(prop('MODEL_FALLBACKS', 'gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite').split(',').map(x => x.trim()).filter(Boolean));
   const body = {
     contents: [{ role: 'user', parts: [{ text: String(req.prompt || '').slice(0, 900000) }] }],
     generationConfig: { temperature: req.temperature == null ? (req.grounded ? 1.0 : 0) : req.temperature, maxOutputTokens: req.maxTokens || 8192 },
@@ -111,16 +114,20 @@ function geminiCall(req) {
   if (req.system) body.systemInstruction = { parts: [{ text: req.system }] };
   if (req.grounded) body.tools = [{ google_search: {} }];
   else if (req.json) body.generationConfig.responseMimeType = 'application/json';
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent';
-  let r, code, txt;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    r = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', headers: { 'x-goog-api-key': prop('GEMINI_KEY') }, payload: JSON.stringify(body), muteHttpExceptions: true });
-    code = r.getResponseCode(); txt = r.getContentText();
+  let code, txt, model;
+  for (let mi = 0; mi < models.length; mi++) {
+    model = models[mi];
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', headers: { 'x-goog-api-key': prop('GEMINI_KEY') }, payload: JSON.stringify(body), muteHttpExceptions: true });
+      code = r.getResponseCode(); txt = r.getContentText();
+      if (code === 200 || [429, 500, 502, 503, 504].indexOf(code) < 0) break;
+      Utilities.sleep(attempt ? 0 : 3000);
+    }
     if (code === 200) break;
-    if ([429, 500, 502, 503, 504].indexOf(code) < 0) break;
-    Utilities.sleep([2000, 6000, 15000, 0][attempt]);
+    if ([404, 429, 500, 502, 503, 504].indexOf(code) < 0) break;   // 400/403 = key or request problem: don't hide it
   }
-  if (code !== 200) throw new Error('gemini_' + code + ': ' + txt.slice(0, 300));
+  if (code !== 200) throw new Error('gemini_' + code + ' (' + model + '): ' + txt.slice(0, 300));
   const j = JSON.parse(txt);
   const cand = (j.candidates || [])[0] || {};
   const text = ((cand.content || {}).parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('');
@@ -355,7 +362,9 @@ function setup() {
 
 // Run from the editor to confirm the key, model and Google Patents access all work.
 function selfTest() {
-  Logger.log(JSON.stringify(geminiCall({ prompt: 'Reply with the word OK.' })).slice(0, 300));
-  Logger.log(JSON.stringify(gpSearch('rain actuated cover drying yard', 5)).slice(0, 600));
-  Logger.log(JSON.stringify(openalex('nanofluid quenching', 3)).slice(0, 400));
+  const t = (name, f) => { try { Logger.log(name + ' OK: ' + JSON.stringify(f()).slice(0, 600)); } catch (e) { Logger.log(name + ' FAILED: ' + e.message); } };
+  t('Gemini', () => { const r = geminiCall({ prompt: 'Reply with the word OK.' }); return { model: r.model, text: r.text }; });
+  t('Google Patents', () => gpSearch('rain actuated cover drying yard', 5));
+  t('Google Patents full text', () => { const d = gpFetch('US9157687B2'); return { title: d.title, abstract: d.abstract.slice(0, 150), claimsChars: d.claims.length, descChars: d.description.length }; });
+  t('OpenAlex', () => openalex('nanofluid quenching', 3).map(x => x.title));
 }
