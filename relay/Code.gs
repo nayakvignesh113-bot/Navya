@@ -74,10 +74,11 @@ function auth(idToken) {
   if (owners.includes(email)) return { email, name: info.name, role: 'owner' };
   const u = findUser(email);
   if (u && u.status === 'approved') return { email, name: info.name, role: 'approved', limit: u.limit };
-  if (u && u.status === 'blocked') return { email, name: info.name, role: 'pending' };
+  if (u && u.status === 'blocked') return { email, name: info.name, role: 'pending', status: 'blocked' };
+  if (u && u.status === 'pending') return { email, name: info.name, role: 'pending', status: 'requested', since: u.since };
   const dom = prop('AUTO_APPROVE_DOMAIN', '').toLowerCase();
   if (dom && email.endsWith('@' + dom)) { setUser(email, 'approved'); return { email, name: info.name, role: 'approved' }; }
-  return { email, name: info.name, role: 'pending' };
+  return { email, name: info.name, role: 'pending', status: 'none' };
 }
 function ownerOnly(who) { if (who.role !== 'owner') throw new Error('owner_only'); }
 function limitFor(who) { return who.role === 'owner' ? 100000 : (Number(who.limit) || Number(prop('STUDENT_DAILY_CALLS', '150'))); }
@@ -218,7 +219,7 @@ function log(email, kind, detail) { try { sheet('Log').appendRow([new Date(), em
 function findUser(email) {
   const sh = sheet('Users'); if (!sh) return null;
   const v = sh.getDataRange().getValues();
-  for (let i = 1; i < v.length; i++) if (String(v[i][0]).toLowerCase() === email) return { row: i + 1, email, status: v[i][1], limit: v[i][2] };
+  for (let i = 1; i < v.length; i++) if (String(v[i][0]).toLowerCase() === email) return { row: i + 1, email, status: v[i][1], limit: v[i][2], since: v[i][3] };
   return null;
 }
 function setUser(email, status, limit) {
@@ -228,7 +229,17 @@ function setUser(email, status, limit) {
   else sh.appendRow([email, status, limit == null ? '' : limit, new Date(), '']);
 }
 function requestAccess(who, note) {
-  if (!findUser(who.email)) { sheet('Users').appendRow([who.email, 'pending', '', new Date(), String(note || '').slice(0, 300)]); }
+  if (findUser(who.email)) return;           // already requested, approved or blocked: no duplicate mail
+  note = String(note || '').slice(0, 500);
+  sheet('Users').appendRow([who.email, 'pending', '', new Date(), note]);
+  const site = prop('SITE_URL', 'https://nayakvignesh113-bot.github.io/Navya/');
+  prop('OWNER_EMAILS', '').split(',').map(x => x.trim()).filter(Boolean).forEach(to => {
+    try {
+      MailApp.sendEmail(to, 'Navya: access request from ' + who.email,
+        'Name on Google account: ' + (who.name || '-') + '\nEmail: ' + who.email + '\n\nTheir note:\n' + (note || '(none)') +
+        '\n\nApprove or reject: ' + site + '#admin\n(or set the status in the Users sheet to approved / blocked)');
+    } catch (e) { }
+  });
 }
 function listUsers() {
   const v = sheet('Users').getDataRange().getValues(); v.shift();

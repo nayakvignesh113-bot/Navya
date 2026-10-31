@@ -57,3 +57,6 @@ footer{text-align:center;color:var(--mute);font-size:.8rem;padding:20px}
 @media print{.top,nav,footer,.btn,.row button{display:none!important}.tab{display:none!important}#tab-report{display:block!important}.card{border:0}}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink);vertical-align:middle}
 .dot.full{background:var(--ink)}.dot.half{background:linear-gradient(90deg,var(--ink) 50%,#fff 50%)}
+body.locked main,body.locked nav{display:none!important}
+.lock{display:none;max-width:560px;margin:60px auto;padding:0 18px}body.locked .lock{display:block}
+.lock textarea{margin:8px 0}.badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--bad);color:#fff;font-size:.72rem;text-align:center}

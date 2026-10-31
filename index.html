@@ -11,7 +11,7 @@
 <script src="config.js"></script>
 <script src="engine.js"></script>
 </head>
-<body>
+<body class="locked">
 <header class="top">
   <div class="brand"><span class="logo">न</span><div><b>Navya</b><small>Patent Engine · prior art · patentability · claims</small></div></div>
   <nav id="tabs">
@@ -26,11 +26,14 @@
   <div id="who"><div id="gsi"></div><span id="whoText"></span></div>
 </header>
 
+<section id="lock" class="lock"><div class="card">
+  <h2>Navya is private</h2>
+  <div id="lockBody"><p>Sign in with your Google account (button at the top right). Access is granted individually by the administrator.</p></div>
+</div></section>
 <main>
 <!-- ============================================================ ANALYSE -->
 <section id="tab-analyse" class="tab on">
-  <div id="gate" class="card hidden"></div>
-  <div class="grid2">
+    <div class="grid2">
     <div class="card">
       <h2>1 · Patent document</h2>
       <label id="drop" class="drop">

@@ -65,13 +65,29 @@ async function onCredential(resp) {
   } catch (e) { $('#whoText').textContent = 'Sign-in failed: ' + e.message; }
 }
 function gate() {
-  const g = $('#gate');
-  if (S.user && S.user.role === 'pending') {
-    g.classList.remove('hidden');
-    g.innerHTML = '<h2>Access needed</h2><p>Your account (' + esc(S.user.email) + ') is not yet approved. Rule-based parsing and formal checks work without approval; search and AI need it.</p>' +
-      '<input id="reqNote" placeholder="Your name, department, guide"><div class="row"><button class="btn primary" id="reqBtn">Request access</button></div>';
-    $('#reqBtn').onclick = async () => { await relay('requestAccess', { note: $('#reqNote').value }); g.innerHTML = '<p>Request sent. You will be able to run searches once approved.</p>'; };
-  } else g.classList.add('hidden');
+  const u = S.user, body = $('#lockBody');
+  const ok = u && (u.role === 'owner' || u.role === 'approved');
+  document.body.classList.toggle('locked', !ok);
+  if (ok) { if (u.role === 'owner') pendingBadge(); return; }
+  if (!u) { body.innerHTML = '<p>Sign in with your Google account (button at the top right). Access is granted individually by the administrator.</p>'; return; }
+  if (u.status === 'blocked') { body.innerHTML = '<p>Your access request (' + esc(u.email) + ') was not approved. Contact the administrator if this is a mistake.</p>'; return; }
+  if (u.status === 'requested') { body.innerHTML = '<p>Request received for <b>' + esc(u.email) + '</b>' + (u.since ? ' on ' + esc(new Date(u.since).toLocaleDateString()) : '') + '. You will get access once the administrator approves it — reload this page later.</p>'; return; }
+  body.innerHTML = '<p>Signed in as <b>' + esc(u.email) + '</b>. This account does not have access yet.</p>' +
+    '<label class="fld">Your name, department / USN, guide, and what you want to analyse<textarea id="reqNote" rows="3"></textarea></label>' +
+    '<button class="btn primary" id="reqBtn">Request access</button>';
+  $('#reqBtn').onclick = async () => {
+    const note = $('#reqNote').value.trim();
+    if (note.length < 10) { $('#reqNote').focus(); return; }
+    $('#reqBtn').disabled = true;
+    try { await relay('requestAccess', { note }); u.status = 'requested'; u.since = new Date().toISOString(); gate(); }
+    catch (e) { $('#reqBtn').disabled = false; body.insertAdjacentHTML('beforeend', '<p class="sev-error">' + esc(e.message) + '</p>'); }
+  };
+}
+async function pendingBadge() {
+  try {
+    const r = await relay('listUsers'); const n = r.users.filter(x => x.status === 'pending').length;
+    const b = $('[data-tab="admin"]'); b.innerHTML = 'Admin' + (n ? '<span class="badge">' + n + '</span>' : '');
+  } catch (e) { }
 }
 
 // ======================================================================== tabs
@@ -81,6 +97,7 @@ function showTab(t) {
   if (location.hash !== '#' + t) history.replaceState(null, '', '#' + t);
   if (t === 'radar' && !$('#radarList').dataset.loaded) loadRadar();
   if (t === 'history' && !$('#histList').dataset.loaded) loadHistory();
+  if (t === 'admin' && !$('#usersList').dataset.loaded) { $('#usersList').dataset.loaded = '1'; loadUsers(); }
 }
 
 // ================================================================ file reading
@@ -594,9 +611,12 @@ async function loadHistory() {
 async function loadUsers(r) {
   try {
     r = r || await relay('listUsers');
-    $('#usersList').innerHTML = '<table><tr><th>Email</th><th>Status</th><th>Daily AI calls</th><th>Used today</th><th>Note</th><th></th></tr>' + r.users.map(u => '<tr><td>' + esc(u.email) + '</td><td>' + esc(u.status) + '</td><td><input style="width:80px" data-lim="' + esc(u.email) + '" value="' + esc(u.limit) + '" placeholder="default"></td><td>' + esc(u.usedToday) + '</td><td>' + esc(u.note) + '</td><td>' +
-      ['approved', 'blocked'].map(s => '<button class="btn sm" data-set="' + s + '" data-u="' + esc(u.email) + '">' + (s === 'approved' ? 'Approve' : 'Block') + '</button>').join(' ') + '</td></tr>').join('') + '</table>';
-    $$('[data-set]').forEach(b => b.onclick = async () => { const lim = $('[data-lim="' + b.dataset.u + '"]').value; loadUsers(await relay('setUser', { email: b.dataset.u, status: b.dataset.set, limit: lim === '' ? '' : +lim })); });
+    const order = { pending: 0, approved: 1, blocked: 2 };
+    r.users.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+    const np = r.users.filter(x => x.status === 'pending').length;
+    $('#usersList').innerHTML = '<p class="muted">' + np + ' pending request(s). Approved users get the default daily AI-call limit unless you set one.</p><table><tr><th>Email</th><th>Status</th><th>Daily AI calls</th><th>Used today</th><th>Note</th><th></th></tr>' + r.users.map(u => '<tr><td>' + esc(u.email) + '</td><td>' + esc(u.status) + '</td><td><input style="width:80px" data-lim="' + esc(u.email) + '" value="' + esc(u.limit) + '" placeholder="default"></td><td>' + esc(u.usedToday) + '</td><td>' + esc(u.note) + '</td><td>' +
+      ['approved', 'blocked'].map(s => '<button class="btn sm" data-set="' + s + '" data-u="' + esc(u.email) + '">' + (s === 'approved' ? 'Approve' : (u.status === 'pending' ? 'Reject' : 'Block')) + '</button>').join(' ') + '</td></tr>').join('') + '</table>';
+    $$('[data-set]').forEach(b => b.onclick = async () => { const lim = $('[data-lim="' + b.dataset.u + '"]').value; loadUsers(await relay('setUser', { email: b.dataset.u, status: b.dataset.set, limit: lim === '' ? '' : +lim })); pendingBadge(); });
   } catch (e) { $('#usersList').innerHTML = '<p class="sev-error">' + esc(e.message) + '</p>'; }
 }
 
