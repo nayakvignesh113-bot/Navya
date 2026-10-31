@@ -331,9 +331,12 @@ function cosine(a, b) {
 
 // ----------------------------------------------------------------------- setup
 function setup() {
-  let id = prop('SPREADSHEET_ID', '');
-  let book;
-  if (!id) { book = SpreadsheetApp.create('Navya Patent Engine — data'); P.setProperty('SPREADSHEET_ID', book.getId()); } else book = SpreadsheetApp.openById(id);
+  // Use the sheet this script is attached to (Extensions → Apps Script); else the saved one; else create one.
+  let book = null;
+  try { book = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { }
+  if (book) P.setProperty('SPREADSHEET_ID', book.getId());
+  else if (prop('SPREADSHEET_ID', '')) book = SpreadsheetApp.openById(prop('SPREADSHEET_ID'));
+  else { book = SpreadsheetApp.create('Navya Patent Engine — data'); P.setProperty('SPREADSHEET_ID', book.getId()); }
   const want = {
     Users: ['email', 'status (approved/pending/blocked)', 'daily call limit (blank = default)', 'since', 'note'],
     Reports: ['when', 'email', 'drive file id', 'title', 'index', 'band', 'verdict', 'search depth', 'refs mapped'],
@@ -347,6 +350,7 @@ function setup() {
   ScriptApp.newTrigger('radarRun').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(6).create();
   Logger.log('Sheet: ' + book.getUrl());
   Logger.log('Folder id: ' + prop('FOLDER_ID'));
+  ['GEMINI_KEY', 'OAUTH_CLIENT_ID', 'OWNER_EMAILS'].forEach(k => { if (!prop(k, '')) Logger.log('MISSING script property: ' + k); });
 }
 
 // Run from the editor to confirm the key, model and Google Patents access all work.
