@@ -45,7 +45,7 @@ Authorised JavaScript origins: `https://nayakvignesh113-bot.github.io`. Copy the
    - `OWNER_EMAILS` = `vignesh@mite.ac.in,nayak.vignesh113@gmail.com`
    - `AUTO_APPROVE_DOMAIN` = `mite.ac.in` (optional: students signing in with college accounts are approved automatically)
    - `RADAR_EMAIL` = `true` (optional: weekly digest by email)
-   - `CONTACT_EMAIL` = your email (sent to OpenAlex)
+   - `OPENALEX_KEY` = free key from https://openalex.org/settings/api (OpenAlex requires one since Feb 2026)
    - `MODEL` (optional) — default `gemini-flash-latest`. Google renames models often; if calls fail with 404, set a current free-tier Flash model ID.
 4. Run `setup` once and authorise. It creates the Sheet, the Drive folder and the weekly radar trigger.
 5. Run `selfTest` and check the log. You should see an OK from Gemini plus Google Patents and OpenAlex results.

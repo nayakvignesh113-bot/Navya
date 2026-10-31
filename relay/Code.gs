@@ -12,7 +12,7 @@
  *   MODEL_FALLBACKS       optional  tried in order on overload/404, default gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite
  *   STUDENT_DAILY_CALLS   optional  default 150 model calls per approved user per day (~4 full analyses)
  *   RADAR_EMAIL           optional  "true" to email owners the weekly radar digest
- *   CONTACT_EMAIL         optional  sent to OpenAlex as mailto (polite pool)
+ *   OPENALEX_KEY          recommended  free key from openalex.org/settings/api (required by OpenAlex since Feb 2026)
  * Run setup() once from the editor; it creates the Sheet, Drive folder and weekly trigger.
  */
 
@@ -193,9 +193,10 @@ function openalex(q, perPage, before, after) {
   if (after) f.push('from_publication_date:' + after);
   let url = 'https://api.openalex.org/works?search=' + encodeURIComponent(q) + '&per-page=' + Math.min(perPage || 20, 50);
   if (f.length) url += '&filter=' + f.join(',');
-  const mail = prop('CONTACT_EMAIL', ''); if (mail) url += '&mailto=' + encodeURIComponent(mail);
-  const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (r.getResponseCode() !== 200) throw new Error('openalex_' + r.getResponseCode());
+  const key = prop('OPENALEX_KEY', ''); if (key) url += '&api_key=' + encodeURIComponent(key);
+  let r;
+  for (let a = 0; a < 2; a++) { r = UrlFetchApp.fetch(url, { muteHttpExceptions: true }); if (r.getResponseCode() !== 429) break; Utilities.sleep(2500); }
+  if (r.getResponseCode() !== 200) throw new Error('openalex_' + r.getResponseCode() + (r.getResponseCode() === 429 && !key ? ' (set the OPENALEX_KEY script property — free key from openalex.org/settings/api)' : ''));
   const j = JSON.parse(r.getContentText());
   return (j.results || []).map(w => ({
     source: 'OpenAlex', pn: '', doi: w.doi || '', title: w.title || w.display_name || '',
