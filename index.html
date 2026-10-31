@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navya — Patent Engine</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="engine.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">न</span><div><b>Navya</b><small>Patent Engine · prior art · patentability · claims</small></div></div>
+  <nav id="tabs">
+    <button data-tab="analyse" class="on">Analyse</button>
+    <button data-tab="report">Report</button>
+    <button data-tab="studio">Claims Studio</button>
+    <button data-tab="radar">Opportunity Radar</button>
+    <button data-tab="history">History</button>
+    <button data-tab="method">Method</button>
+    <button data-tab="admin" class="owner-only hidden">Admin</button>
+  </nav>
+  <div id="who"><div id="gsi"></div><span id="whoText"></span></div>
+</header>
+
+<main>
+<!-- ============================================================ ANALYSE -->
+<section id="tab-analyse" class="tab on">
+  <div id="gate" class="card hidden"></div>
+  <div class="grid2">
+    <div class="card">
+      <h2>1 · Patent document</h2>
+      <label id="drop" class="drop">
+        <input type="file" id="file" accept=".pdf,.docx,.txt,.md" hidden>
+        <b>Drop a PDF / DOCX / TXT</b><span>complete or provisional specification with claims</span>
+      </label>
+      <p class="or">or paste the text</p>
+      <textarea id="paste" rows="9" placeholder="Paste the specification here (title, description, “We claim:” 1. … 2. …, abstract)"></textarea>
+      <div class="row"><button id="parseBtn" class="btn">Parse document</button><span id="fileInfo" class="muted"></span></div>
+    </div>
+    <div class="card">
+      <h2>2 · Settings</h2>
+      <label class="fld">Prior-art cut-off (priority / filing date)<input type="date" id="cutoff"></label>
+      <label class="fld">Analysis mode
+        <select id="mode">
+          <option value="ai">AI-assisted (free Gemini key) — reads meaning, quotes verified</option>
+          <option value="rule">Rule-based (no AI) — lexical matching, fully deterministic</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="optConsistency" checked> Double-check every AI judgement (two blinded runs, shuffled order)</label>
+      <label class="chk"><input type="checkbox" id="optWeb"> Also search the open web via Gemini + Google Search (uses free grounding quota)</label>
+      <label class="chk"><input type="checkbox" id="optNpl" checked> Include scientific literature (OpenAlex)</label>
+      <label class="fld">References to map element-by-element <input type="number" id="nMap" value="8" min="3" max="15"></label>
+      <p class="note" id="confNote">Free Gemini tier: Google may use inputs to improve its products. For an unfiled confidential invention use <b>Rule-based</b> mode (only search keywords leave your browser) or file a provisional first.</p>
+    </div>
+  </div>
+
+  <div id="parsed" class="card hidden">
+    <h2>3 · What the engine understood <small class="muted">edit elements before running — scoring is element-by-element</small></h2>
+    <div id="secFound" class="muted"></div>
+    <div id="claimsView"></div>
+    <div class="row"><button id="runBtn" class="btn primary">Run prior-art search &amp; analysis</button><button id="stopBtn" class="btn hidden">Stop</button></div>
+  </div>
+
+  <div id="progress" class="card hidden"><h2>Progress</h2><ol id="steps"></ol></div>
+</section>
+
+<!-- ============================================================ REPORT -->
+<section id="tab-report" class="tab"><div id="reportView" class="empty">Run an analysis or open one from History.</div></section>
+
+<!-- ============================================================ STUDIO -->
+<section id="tab-studio" class="tab"><div id="studioView" class="empty">Run an analysis first — Claims Studio works from its distinguishing features and references.</div></section>
+
+<!-- ============================================================ RADAR -->
+<section id="tab-radar" class="tab">
+  <div class="card">
+    <h2>Opportunity Radar <small class="muted">runs weekly (Mon 06:00 IST), two mechanical-engineering domains per run</small></h2>
+    <div class="row"><select id="radarDomain"><option value="">All domains</option></select><button id="radarLoad" class="btn">Refresh</button><button id="radarRun" class="btn owner-only hidden">Run now</button></div>
+    <p class="note">White-space = 1 − text similarity to the nearest Google Patents hit for the idea's own query. It is a screening signal, not a search: send promising ideas to <b>Analyse</b>.</p>
+  </div>
+  <div id="radarList"></div>
+</section>
+
+<!-- ============================================================ HISTORY -->
+<section id="tab-history" class="tab"><div class="card"><div class="row"><h2>Saved reports</h2><button id="histLoad" class="btn">Refresh</button></div><div id="histList"></div></div></section>
+
+<!-- ============================================================ METHOD -->
+<section id="tab-method" class="tab"><div class="card prose" id="methodView"></div></section>
+
+<!-- ============================================================ ADMIN -->
+<section id="tab-admin" class="tab"><div class="card"><div class="row"><h2>Users</h2><button id="usersLoad" class="btn">Refresh</button></div><div id="usersList"></div></div></section>
+</main>
+
+<div id="modal" class="modal hidden"><div class="modal-box"><button class="x" id="modalX">×</button><div id="modalBody"></div></div></div>
+<footer>Navya screens prior art and scores claims by a published, deterministic formula. It is not a patent search report or a legal opinion; a registered patent agent should review any filing.</footer>
+<script src="app.js"></script>
+</body>
+</html>
